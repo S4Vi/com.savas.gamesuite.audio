@@ -1,0 +1,26 @@
+# This repo is a Unity UPM package. It is meant to be embedded in, or referenced by,
+# a Unity project — not opened as a project itself. Ignore any project cruft that
+# might appear if someone opens the folder directly.
+
+# Unity project output
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+
+# IDE / build files
+.vs/
+.vscode/
+.idea/
+*.csproj
+*.sln
+*.slnx
+*.user
+*.lscache
+
+# OS
+.DS_Store
+Thumbs.db

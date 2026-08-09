@@ -1,0 +1,23 @@
+# Normalize line endings so clones are consistent across machines.
+* text=auto
+
+# Unity text assets — keep LF, never merge binary-ish YAML.
+*.cs        text
+*.asmdef    text
+*.json      text
+*.meta      text
+*.md        text
+*.uss       text
+*.uxml      text
+
+# Unity YAML assets are large; use LF and treat as text.
+*.asset     text
+*.prefab    text
+*.unity     text
+
+# Binary assets.
+*.png       binary
+*.jpg       binary
+*.wav       binary
+*.mp4       binary
+*.dll       binary

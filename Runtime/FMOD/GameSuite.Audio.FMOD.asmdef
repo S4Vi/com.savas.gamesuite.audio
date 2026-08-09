@@ -1,0 +1,27 @@
+{
+    "name": "GameSuite.Audio.FMOD",
+    "rootNamespace": "GameSuite.Audio.FMOD",
+    "references": [
+        "GameSuite.Audio",
+        "GameSuite.Core",
+        "GameSuite.Logging",
+        "FMODUnity"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "GAMESUITE_AUDIO_FMOD_PRESENT"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.fmod.unity",
+            "expression": "1.0.0",
+            "define": "GAMESUITE_AUDIO_FMOD_PRESENT"
+        }
+    ],
+    "noEngineReferences": false
+}

@@ -1,0 +1,17 @@
+{
+    "name": "GameSuite.Audio",
+    "rootNamespace": "GameSuite.Audio",
+    "references": [
+        "GameSuite.Core",
+        "GameSuite.Logging"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

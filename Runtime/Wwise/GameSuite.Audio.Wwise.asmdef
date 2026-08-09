@@ -1,0 +1,20 @@
+{
+    "name": "GameSuite.Audio.Wwise",
+    "rootNamespace": "GameSuite.Audio.Wwise",
+    "references": [
+        "GameSuite.Audio",
+        "GameSuite.Core",
+        "GameSuite.Logging"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "GAMESUITE_AUDIO_WWISE"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
