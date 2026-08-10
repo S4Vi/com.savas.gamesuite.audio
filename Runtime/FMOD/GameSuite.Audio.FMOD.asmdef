@@ -5,6 +5,7 @@
         "GameSuite.Audio",
         "GameSuite.Core",
         "GameSuite.Logging",
+        "GameSuite.Threading",
         "FMODUnity"
     ],
     "includePlatforms": [],

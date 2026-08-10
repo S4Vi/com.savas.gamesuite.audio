@@ -1,3 +1,5 @@
+using System;
+
 using GameSuite.Audio.Unity;
 
 using NUnit.Framework;
@@ -61,24 +63,72 @@ namespace GameSuite.Audio.Tests
         }
 
         [Test]
-        public void PlaySfxIgnoresNullCue()
+        public void PlayIgnoresNullCueAndReturnsEmptyGuid()
         {
-            Assert.DoesNotThrow(() => service.PlaySfx(null!));
+            Guid id = default;
+            Assert.DoesNotThrow(() => id = service.Play(null!));
+            Assert.AreEqual(Guid.Empty, id);
         }
 
         [Test]
-        public void PlayMusicIgnoresNullCue()
+        public void PlayOneShotIgnoresNullCue()
         {
-            Assert.DoesNotThrow(() => service.PlayMusic(null!));
+            Assert.DoesNotThrow(() => service.PlayOneShot(null!));
         }
 
         [Test]
-        public void PlaySfxIgnoresUninitializedService()
+        public void PlayReturnsEmptyGuidWhenServiceNotInitialized()
         {
             var cue = ScriptableObject.CreateInstance<UnityAudioCue>();
             try
             {
-                Assert.DoesNotThrow(() => service.PlaySfx(cue));
+                Guid id = default;
+                Assert.DoesNotThrow(() => id = service.Play(cue));
+                Assert.AreEqual(Guid.Empty, id);
+            }
+            finally
+            {
+                Object.DestroyImmediate(cue);
+            }
+        }
+
+        [Test]
+        public void StopIgnoresUnknownId()
+        {
+            Assert.DoesNotThrow(() => service.Stop(Guid.NewGuid()));
+        }
+
+        [Test]
+        public void SetVolumeIgnoresUnknownId()
+        {
+            Assert.DoesNotThrow(() => service.SetVolume(Guid.NewGuid(), 0.5f));
+        }
+
+        [Test]
+        public void GetVolumeReturnsFalseForUnknownId()
+        {
+            Assert.IsFalse(service.GetVolume(Guid.NewGuid(), out _));
+        }
+
+        [Test]
+        public void IsPlayingReturnsFalseForUnknownId()
+        {
+            Assert.IsFalse(service.IsPlaying(Guid.NewGuid()));
+        }
+
+        [Test]
+        public void GetPausedReturnsFalseForUnknownId()
+        {
+            Assert.IsFalse(service.GetPaused(Guid.NewGuid(), out _));
+        }
+
+        [Test]
+        public void FindActiveReturnsEmptyForUnknownCue()
+        {
+            var cue = ScriptableObject.CreateInstance<UnityAudioCue>();
+            try
+            {
+                Assert.IsEmpty(service.FindActive(cue));
             }
             finally
             {

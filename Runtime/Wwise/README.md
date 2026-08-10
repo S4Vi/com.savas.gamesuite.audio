@@ -28,16 +28,28 @@ types are usable from `WwiseAudioService.cs`, the Wwise integration itself needs
    `.asmdef`, per the note above.
 2. Add `GAMESUITE_AUDIO_WWISE` to Player Settings' scripting define symbols, and this assembly's name
    to `GameSuite.Audio.Wwise.asmdef` → `references`.
-3. Implement each `TODO` in `WwiseAudioService.cs`:
-   - `PlaySfx` — `AkSoundEngine.PostEvent(cue.EventName, gameObject)`.
-   - `PlayMusic` / `StopMusic` — post the music event and let a Wwise Music Switch/Blend Container
-     handle the transition in the Studio project, or drive a fade through an RTPC.
+3. Implement each `TODO` in `WwiseAudioService.cs`. The biggest structural piece is instance
+   tracking: `Play` needs to post the event with an `AkCallbackType` callback (`AK_EndOfEvent` /
+   `AK_Marker`), keyed by the `Guid` it returns, so `Stop`/`SetVolume`/`IsPlaying`/etc. can look the
+   instance back up and so the callback can raise `Stopped`/`MarkerReached` — the same native-callback
+   shape `FMODAudioService` in the sibling `Runtime/FMOD/` folder already implements against FMOD's
+   `EVENT_CALLBACK`, worth reading first as a model even though the two APIs differ:
+   - `Play` / `PlayOneShot` — `AkSoundEngine.PostEvent(cue.EventName, gameObject, ...)`.
+   - `Stop` — `AkSoundEngine.StopPlayingID(playingId)`, or a dedicated "stop" event for an authored fade.
+   - `SetPaused` — `AkSoundEngine.ExecuteActionOnPlayingID` with `AkActionOnEventType_Pause` / `_Resume`.
+   - `SetVolume` / `SetPitch` — Wwise has no per-instance volume/pitch call; drive RTPCs scoped to the
+     `GameObject` the event was posted on instead.
+   - `GetPlaybackPositionSeconds` — `AkSoundEngine.GetSourcePlayPosition(playingId, out var positionMs)`.
+   - `SetParameter(float)` — `AkSoundEngine.SetRTPCValue(parameterName, value, gameObject)`.
+   - `SetParameter(string)` — RTPCs are numeric only; a labeled parameter needs a Switch instead:
+     `AkSoundEngine.SetSwitch(parameterName, label, gameObject)`.
    - `SetBusVolume` / `GetBusVolume` — Wwise buses aren't scripted directly; map each `AudioBus` to a
      Game Parameter (RTPC) the Studio project's bus volume is driven by, and call
      `AkSoundEngine.SetRTPCValue(...)` (`GetRTPCValue` is normally write-only from the game side, so
      you'll likely need to track the value locally too).
    - `SetBusMuted` / `IsBusMuted` — track the flag yourself and drive the RTPC to 0 while muted,
-     remembering the pre-mute value, the same way you'd extend `UnityAudioService`.
+     remembering the pre-mute value, the same way `UnityAudioService`/`FMODAudioService` do.
 4. A game opts into this backend by constructing `new WwiseAudioService()` and registering it with
    `GameSuiteBootstrap.Register(...)` instead of `UnityAudioService` — nothing else in
-   `GameSuite.Audio` needs to change.
+   `GameSuite.Audio` needs to change, including `MusicController`/`AmbienceController`, which are
+   built entirely on `IAudioService` and don't know which backend they're driving.

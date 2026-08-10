@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 using GameSuite.Core;
 
 #nullable enable
@@ -15,6 +18,14 @@ namespace GameSuite.Audio.Wwise
         public int InitializationOrder => -50;
 
         /// <inheritdoc/>
+#pragma warning disable 0067 // stub: nothing raises these until the TODOs below are implemented.
+        public event Action<Guid>? Stopped;
+
+        /// <inheritdoc/>
+        public event Action<Guid, string>? MarkerReached;
+#pragma warning restore 0067
+
+        /// <inheritdoc/>
         public void Initialize()
         {
             // TODO: Wwise's sound engine initializes itself via AkSoundEngineInitialization /
@@ -28,29 +39,127 @@ namespace GameSuite.Audio.Wwise
         }
 
         /// <inheritdoc/>
-        public void PlaySfx(AudioCue cue, float volumeScale = 1f)
+        public Guid Play(AudioCue cue, float volumeScale = 1f)
         {
-            // TODO: cast to WwiseAudioCue, then AkSoundEngine.PostEvent(cue.EventName, gameObject).
-            // volumeScale has no direct Wwise equivalent; expose it as an RTPC on the event if the
-            // Studio project needs per-call volume control.
-            throw new System.NotImplementedException("WwiseAudioService.PlaySfx is not implemented yet.");
+            // TODO: cast to WwiseAudioCue, then AkSoundEngine.PostEvent(cue.EventName, gameObject,
+            // (uint)AkCallbackType.AK_EndOfEvent | AK_Marker, callback, ...) so the callback can drive
+            // Stopped/MarkerReached the way FMODAudioService's native STOPPED/TIMELINE_MARKER callback
+            // does. Track the returned playing ID keyed by the Guid this method returns.
+            throw new System.NotImplementedException("WwiseAudioService.Play is not implemented yet.");
         }
 
         /// <inheritdoc/>
-        public void PlayMusic(AudioCue cue, float fadeSeconds = 0f)
+        public void PlayOneShot(AudioCue cue, float volumeScale = 1f)
         {
-            // TODO: post the music event and let a Wwise Music Switch Container / Blend Container
-            // handle the crossfade in the Studio project, or drive fadeSeconds through an RTPC the
-            // same way UnityAudioService lerps AudioSource.volume.
-            throw new System.NotImplementedException("WwiseAudioService.PlayMusic is not implemented yet.");
+            // TODO: AkSoundEngine.PostEvent(cue.EventName, gameObject) with no callback/tracking.
+            throw new System.NotImplementedException("WwiseAudioService.PlayOneShot is not implemented yet.");
         }
 
         /// <inheritdoc/>
-        public void StopMusic(float fadeSeconds = 0f)
+        public void Stop(Guid id, bool allowReleaseFade = true)
         {
-            // TODO: AkSoundEngine.StopAll or a dedicated "stop music" event with an authored fade-out;
-            // fadeSeconds only matters if it should override the event's authored release.
-            throw new System.NotImplementedException("WwiseAudioService.StopMusic is not implemented yet.");
+            // TODO: AkSoundEngine.StopPlayingID(playingId) for immediate stop, or post a dedicated
+            // "stop" event with an authored fade-out when allowReleaseFade is true.
+            throw new System.NotImplementedException("WwiseAudioService.Stop is not implemented yet.");
+        }
+
+        /// <inheritdoc/>
+        public void StopAll(AudioBus? bus = null)
+        {
+            // TODO: AkSoundEngine.StopAll(gameObject) for everything, or iterate tracked instances by
+            // bus the same way UnityAudioService/FMODAudioService do.
+            throw new System.NotImplementedException("WwiseAudioService.StopAll is not implemented yet.");
+        }
+
+        /// <inheritdoc/>
+        public bool IsPlaying(Guid id)
+        {
+            throw new System.NotImplementedException("WwiseAudioService.IsPlaying is not implemented yet.");
+        }
+
+        /// <inheritdoc/>
+        public void SetPaused(Guid id, bool paused)
+        {
+            // TODO: AkSoundEngine.ExecuteActionOnPlayingID(AkActionOnEventType.AkActionOnEventType_Pause / _Resume, playingId).
+            throw new System.NotImplementedException("WwiseAudioService.SetPaused is not implemented yet.");
+        }
+
+        /// <inheritdoc/>
+        public bool GetPaused(Guid id, out bool paused)
+        {
+            throw new System.NotImplementedException("WwiseAudioService.GetPaused is not implemented yet.");
+        }
+
+        /// <inheritdoc/>
+        public void SetVolume(Guid id, float volume01)
+        {
+            // TODO: Wwise has no per-playing-instance volume call; drive an RTPC scoped to the
+            // GameObject the event was posted on instead.
+            throw new System.NotImplementedException("WwiseAudioService.SetVolume is not implemented yet.");
+        }
+
+        /// <inheritdoc/>
+        public bool GetVolume(Guid id, out float volume01)
+        {
+            throw new System.NotImplementedException("WwiseAudioService.GetVolume is not implemented yet.");
+        }
+
+        /// <inheritdoc/>
+        public void SetPitch(Guid id, float pitch)
+        {
+            // TODO: drive an authored "Pitch" RTPC scoped to the GameObject the event was posted on;
+            // Wwise has no direct per-instance pitch call either.
+            throw new System.NotImplementedException("WwiseAudioService.SetPitch is not implemented yet.");
+        }
+
+        /// <inheritdoc/>
+        public bool GetPitch(Guid id, out float pitch)
+        {
+            throw new System.NotImplementedException("WwiseAudioService.GetPitch is not implemented yet.");
+        }
+
+        /// <inheritdoc/>
+        public bool GetLengthSeconds(Guid id, out float seconds)
+        {
+            // TODO: AkSoundEngine.GetSourcePlayPosition or a cached duration from the Wwise project's
+            // generated SoundBank metadata; Wwise doesn't expose this as directly as FMOD does.
+            throw new System.NotImplementedException("WwiseAudioService.GetLengthSeconds is not implemented yet.");
+        }
+
+        /// <inheritdoc/>
+        public bool GetPlaybackPositionSeconds(Guid id, out float seconds)
+        {
+            // TODO: AkSoundEngine.GetSourcePlayPosition(playingId, out var positionMs).
+            throw new System.NotImplementedException("WwiseAudioService.GetPlaybackPositionSeconds is not implemented yet.");
+        }
+
+        /// <inheritdoc/>
+        public void SetPlaybackPositionSeconds(Guid id, float seconds)
+        {
+            // TODO: Wwise has no direct seek call; typically handled via a Wwise "Seek" action/event
+            // authored in the Studio project instead.
+            throw new System.NotImplementedException("WwiseAudioService.SetPlaybackPositionSeconds is not implemented yet.");
+        }
+
+        /// <inheritdoc/>
+        public void SetParameter(Guid id, string parameterName, float value)
+        {
+            // TODO: AkSoundEngine.SetRTPCValue(parameterName, value, gameObject).
+            throw new System.NotImplementedException("WwiseAudioService.SetParameter is not implemented yet.");
+        }
+
+        /// <inheritdoc/>
+        public void SetParameter(Guid id, string parameterName, string label)
+        {
+            // TODO: Wwise RTPCs are numeric only; labeled parameters need a Switch instead —
+            // AkSoundEngine.SetSwitch(parameterName, label, gameObject).
+            throw new System.NotImplementedException("WwiseAudioService.SetParameter is not implemented yet.");
+        }
+
+        /// <inheritdoc/>
+        public IReadOnlyList<Guid> FindActive(AudioCue cue)
+        {
+            throw new System.NotImplementedException("WwiseAudioService.FindActive is not implemented yet.");
         }
 
         /// <inheritdoc/>

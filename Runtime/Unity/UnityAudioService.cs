@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -10,14 +11,28 @@ using GameSuite.GameLogging;
 namespace GameSuite.Audio.Unity
 {
     /// <summary>
-    /// <see cref="IAudioService"/> backed by Unity's built-in <see cref="AudioSource"/> playback: a
-    /// pooled voice per one-shot SFX and two dedicated sources crossfaded for music. Register an
-    /// instance with <see cref="GameSuiteBootstrap.Register"/> to opt a game into this backend.
+    /// <see cref="IAudioService"/> backed by Unity's built-in <see cref="AudioSource"/> playback: every
+    /// tracked instance draws a pooled voice, freed once it stops. Register an instance with
+    /// <see cref="GameSuiteBootstrap.Register"/> to opt a game into this backend.
     /// </summary>
+    /// <remarks>
+    /// <see cref="SetParameter(Guid,string,float)"/> has no Unity Audio equivalent and logs a warning
+    /// instead of doing anything; <see cref="MarkerReached"/> is declared to satisfy the interface but
+    /// is never raised, since Unity has no native timeline marker concept.
+    /// </remarks>
     public sealed class UnityAudioService : IGameSystem, IAudioService, ITickable
     {
         const string LogCategory = AudioLogCategories.Audio;
         const string HostName = "[GameSuite.Audio]";
+
+        sealed class Voice
+        {
+            public AudioSource Source = null!;
+            public AudioBus Bus;
+            public AudioCue Cue = null!;
+            public float InstanceVolume;
+            public bool Paused;
+        }
 
         readonly Dictionary<AudioBus, float> busVolume = new Dictionary<AudioBus, float>
         {
@@ -29,29 +44,23 @@ namespace GameSuite.Audio.Unity
             { AudioBus.Master, false }, { AudioBus.Music, false }, { AudioBus.Sfx, false }, { AudioBus.Voice, false }
         };
 
-        readonly List<SfxVoice> activeSfxVoices = new List<SfxVoice>();
+        readonly Dictionary<Guid, Voice> activeVoices = new Dictionary<Guid, Voice>();
+        readonly HashSet<AudioSource> inUseSources = new HashSet<AudioSource>();
+        readonly List<Guid> scratchIds = new List<Guid>();
 
         GameObject? host;
-        AudioSourcePool? sfxPool;
-        AudioSource? musicA;
-        AudioSource? musicB;
-
-        bool musicActiveIsA;
-        bool musicPlaying;
-        float musicBaseVolume;
-
-        bool crossfading;
-        float crossfadeElapsed;
-        float crossfadeDuration;
-        float crossfadeFromStartVolume;
-
-        bool fadingOut;
-        float fadeOutElapsed;
-        float fadeOutDuration;
-        float fadeOutStartVolume;
+        AudioSourcePool? pool;
 
         /// <inheritdoc/>
         public int InitializationOrder => -50;
+
+        /// <inheritdoc/>
+        public event Action<Guid>? Stopped;
+
+        /// <inheritdoc/>
+#pragma warning disable 0067 // never raised: Unity Audio has no native timeline marker concept.
+        public event Action<Guid, string>? MarkerReached;
+#pragma warning restore 0067
 
         /// <inheritdoc/>
         public void Initialize()
@@ -60,10 +69,7 @@ namespace GameSuite.Audio.Unity
             Object.DontDestroyOnLoad(host);
             host.hideFlags = HideFlags.HideAndDontSave;
 
-            sfxPool = new AudioSourcePool(host.transform);
-
-            musicA = CreateMusicSource("MusicVoice A");
-            musicB = CreateMusicSource("MusicVoice B");
+            pool = new AudioSourcePool(host.transform);
         }
 
         /// <inheritdoc/>
@@ -73,137 +79,231 @@ namespace GameSuite.Audio.Unity
                 Object.Destroy(host);
 
             host = null;
-            sfxPool = null;
-            musicA = null;
-            musicB = null;
-            activeSfxVoices.Clear();
-            musicPlaying = false;
-            crossfading = false;
-            fadingOut = false;
+            pool = null;
+            activeVoices.Clear();
+            inUseSources.Clear();
         }
 
         /// <inheritdoc/>
-        public void PlaySfx(AudioCue cue, float volumeScale = 1f)
+        public Guid Play(AudioCue cue, float volumeScale = 1f)
         {
+            if (!TryPrepareVoice(cue, volumeScale, out var source, out var instanceVolume, out var unityCue))
+                return Guid.Empty;
+
+            var id = Guid.NewGuid();
+            activeVoices[id] = new Voice { Source = source, Bus = unityCue!.Bus, Cue = unityCue, InstanceVolume = instanceVolume };
+            inUseSources.Add(source);
+            return id;
+        }
+
+        /// <inheritdoc/>
+        public void PlayOneShot(AudioCue cue, float volumeScale = 1f)
+        {
+            // Tracked the same as Play(); the pool reclaims it once it stops. Unlike FMOD/Wwise,
+            // Unity has no cheaper untracked path worth taking here.
+            Play(cue, volumeScale);
+        }
+
+        bool TryPrepareVoice(AudioCue cue, float volumeScale, out AudioSource source, out float instanceVolume, out UnityAudioCue? unityCue)
+        {
+            source = null!;
+            instanceVolume = 0f;
+            unityCue = null;
+
             if (cue == null)
             {
-                GameLogger.LogWarning("Ignoring PlaySfx; cue is null.", LogCategory);
-                return;
+                GameLogger.LogWarning("Ignoring Play; cue is null.", LogCategory);
+                return false;
             }
 
-            if (cue is not UnityAudioCue unityCue)
+            if (cue is not UnityAudioCue candidate)
             {
-                GameLogger.LogWarning($"Ignoring PlaySfx; '{cue.name}' is not a {nameof(UnityAudioCue)}.", LogCategory);
-                return;
+                GameLogger.LogWarning($"Ignoring Play; '{cue.name}' is not a {nameof(UnityAudioCue)}.", LogCategory);
+                return false;
             }
 
-            if (sfxPool == null)
+            if (pool == null)
             {
-                GameLogger.LogWarning("Ignoring PlaySfx; the service has not been initialized.", LogCategory);
-                return;
+                GameLogger.LogWarning("Ignoring Play; the service has not been initialized.", LogCategory);
+                return false;
             }
 
-            var clip = PickClip(unityCue);
+            var clip = PickClip(candidate);
             if (clip == null)
             {
-                GameLogger.LogWarning($"Ignoring PlaySfx; '{unityCue.name}' has no clips assigned.", LogCategory);
-                return;
+                GameLogger.LogWarning($"Ignoring Play; '{candidate.name}' has no clips assigned.", LogCategory);
+                return false;
             }
 
-            var baseVolume = PickInRange(unityCue.VolumeRange) * volumeScale;
+            instanceVolume = PickInRange(candidate.VolumeRange) * volumeScale;
+            unityCue = candidate;
 
-            var source = sfxPool.Acquire();
+            source = pool.Acquire(s => !inUseSources.Contains(s));
             source.clip = clip;
-            source.pitch = PickInRange(unityCue.PitchRange);
-            source.loop = unityCue.Loop;
-            source.volume = baseVolume * EffectiveVolume(unityCue.Bus);
+            source.pitch = PickInRange(candidate.PitchRange);
+            source.loop = candidate.Loop;
+            source.time = 0f;
+            source.volume = instanceVolume * EffectiveVolume(candidate.Bus);
             source.Play();
-
-            activeSfxVoices.Add(new SfxVoice(source, unityCue.Bus, baseVolume));
+            return true;
         }
 
         /// <inheritdoc/>
-        public void PlayMusic(AudioCue cue, float fadeSeconds = 0f)
+        public void Stop(Guid id, bool allowReleaseFade = true)
         {
-            if (cue == null)
-            {
-                GameLogger.LogWarning("Ignoring PlayMusic; cue is null.", LogCategory);
+            // Unity has no authored release fade to honor; allowReleaseFade is a no-op here.
+            if (!TryGetVoice(id, "Stop", out var voice))
                 return;
-            }
 
-            if (cue is not UnityAudioCue unityCue)
-            {
-                GameLogger.LogWarning($"Ignoring PlayMusic; '{cue.name}' is not a {nameof(UnityAudioCue)}.", LogCategory);
-                return;
-            }
-
-            if (musicA == null || musicB == null)
-            {
-                GameLogger.LogWarning("Ignoring PlayMusic; the service has not been initialized.", LogCategory);
-                return;
-            }
-
-            var clip = PickClip(unityCue);
-            if (clip == null)
-            {
-                GameLogger.LogWarning($"Ignoring PlayMusic; '{unityCue.name}' has no clips assigned.", LogCategory);
-                return;
-            }
-
-            fadingOut = false;
-
-            var from = musicActiveIsA ? musicA : musicB;
-            var to = musicActiveIsA ? musicB : musicA;
-
-            musicBaseVolume = PickInRange(unityCue.VolumeRange);
-
-            to.clip = clip;
-            to.pitch = PickInRange(unityCue.PitchRange);
-            to.loop = unityCue.Loop;
-            to.time = 0f;
-            to.Play();
-
-            musicActiveIsA = !musicActiveIsA;
-            musicPlaying = true;
-
-            if (fadeSeconds <= 0f || !from.isPlaying)
-            {
-                from.Stop();
-                to.volume = musicBaseVolume * EffectiveVolume(AudioBus.Music);
-                crossfading = false;
-                return;
-            }
-
-            crossfading = true;
-            crossfadeElapsed = 0f;
-            crossfadeDuration = fadeSeconds;
-            crossfadeFromStartVolume = from.volume;
-            to.volume = 0f;
+            voice.Source.Stop();
+            ReleaseVoice(id, voice);
+            Stopped?.Invoke(id);
         }
 
         /// <inheritdoc/>
-        public void StopMusic(float fadeSeconds = 0f)
+        public void StopAll(AudioBus? bus = null)
         {
-            if (!musicPlaying)
-                return;
-
-            var active = musicActiveIsA ? musicA : musicB;
-            if (active == null)
-                return;
-
-            crossfading = false;
-
-            if (fadeSeconds <= 0f)
+            scratchIds.Clear();
+            foreach (var kvp in activeVoices)
             {
-                active.Stop();
-                musicPlaying = false;
-                return;
+                if (bus == null || kvp.Value.Bus == bus.Value)
+                    scratchIds.Add(kvp.Key);
             }
 
-            fadingOut = true;
-            fadeOutElapsed = 0f;
-            fadeOutDuration = fadeSeconds;
-            fadeOutStartVolume = active.volume;
+            foreach (var id in scratchIds)
+                Stop(id);
+        }
+
+        /// <inheritdoc/>
+        public bool IsPlaying(Guid id) => activeVoices.TryGetValue(id, out var voice) && !voice.Paused && voice.Source.isPlaying;
+
+        /// <inheritdoc/>
+        public void SetPaused(Guid id, bool paused)
+        {
+            if (!TryGetVoice(id, "SetPaused", out var voice))
+                return;
+
+            voice.Paused = paused;
+            if (paused)
+                voice.Source.Pause();
+            else
+                voice.Source.UnPause();
+        }
+
+        /// <inheritdoc/>
+        public bool GetPaused(Guid id, out bool paused)
+        {
+            if (!activeVoices.TryGetValue(id, out var voice))
+            {
+                paused = false;
+                return false;
+            }
+
+            paused = voice.Paused;
+            return true;
+        }
+
+        /// <inheritdoc/>
+        public void SetVolume(Guid id, float volume01)
+        {
+            if (!TryGetVoice(id, "SetVolume", out var voice))
+                return;
+
+            voice.InstanceVolume = volume01;
+            voice.Source.volume = voice.InstanceVolume * EffectiveVolume(voice.Bus);
+        }
+
+        /// <inheritdoc/>
+        public bool GetVolume(Guid id, out float volume01)
+        {
+            if (!activeVoices.TryGetValue(id, out var voice))
+            {
+                volume01 = 0f;
+                return false;
+            }
+
+            volume01 = voice.InstanceVolume;
+            return true;
+        }
+
+        /// <inheritdoc/>
+        public void SetPitch(Guid id, float pitch)
+        {
+            if (!TryGetVoice(id, "SetPitch", out var voice))
+                return;
+
+            voice.Source.pitch = pitch;
+        }
+
+        /// <inheritdoc/>
+        public bool GetPitch(Guid id, out float pitch)
+        {
+            if (!activeVoices.TryGetValue(id, out var voice))
+            {
+                pitch = 0f;
+                return false;
+            }
+
+            pitch = voice.Source.pitch;
+            return true;
+        }
+
+        /// <inheritdoc/>
+        public bool GetLengthSeconds(Guid id, out float seconds)
+        {
+            seconds = 0f;
+            if (!activeVoices.TryGetValue(id, out var voice) || voice.Source.clip == null)
+                return false;
+
+            seconds = voice.Source.clip.length;
+            return true;
+        }
+
+        /// <inheritdoc/>
+        public bool GetPlaybackPositionSeconds(Guid id, out float seconds)
+        {
+            if (!activeVoices.TryGetValue(id, out var voice))
+            {
+                seconds = 0f;
+                return false;
+            }
+
+            seconds = voice.Source.time;
+            return true;
+        }
+
+        /// <inheritdoc/>
+        public void SetPlaybackPositionSeconds(Guid id, float seconds)
+        {
+            if (!TryGetVoice(id, "SetPlaybackPositionSeconds", out var voice) || voice.Source.clip == null)
+                return;
+
+            voice.Source.time = Mathf.Clamp(seconds, 0f, voice.Source.clip.length);
+        }
+
+        /// <inheritdoc/>
+        public void SetParameter(Guid id, string parameterName, float value)
+        {
+            GameLogger.LogWarning($"Ignoring SetParameter('{parameterName}'); the Unity Audio backend has no parameter concept.", LogCategory);
+        }
+
+        /// <inheritdoc/>
+        public void SetParameter(Guid id, string parameterName, string label)
+        {
+            GameLogger.LogWarning($"Ignoring SetParameter('{parameterName}'); the Unity Audio backend has no parameter concept.", LogCategory);
+        }
+
+        /// <inheritdoc/>
+        public IReadOnlyList<Guid> FindActive(AudioCue cue)
+        {
+            var results = new List<Guid>();
+            foreach (var kvp in activeVoices)
+            {
+                if (kvp.Value.Cue == cue)
+                    results.Add(kvp.Key);
+            }
+
+            return results;
         }
 
         /// <inheritdoc/>
@@ -229,74 +329,42 @@ namespace GameSuite.Audio.Unity
         /// <inheritdoc/>
         public void Tick(float deltaTime)
         {
-            PruneFinishedSfxVoices();
-            TickCrossfade(deltaTime);
-            TickFadeOut(deltaTime);
-        }
-
-        void TickCrossfade(float deltaTime)
-        {
-            if (!crossfading || musicA == null || musicB == null)
-                return;
-
-            var from = musicActiveIsA ? musicB : musicA;
-            var to = musicActiveIsA ? musicA : musicB;
-
-            crossfadeElapsed += deltaTime;
-            var t = crossfadeDuration <= 0f ? 1f : Mathf.Clamp01(crossfadeElapsed / crossfadeDuration);
-            var musicVolume = EffectiveVolume(AudioBus.Music);
-
-            from.volume = Mathf.Lerp(crossfadeFromStartVolume, 0f, t);
-            to.volume = Mathf.Lerp(0f, musicBaseVolume * musicVolume, t);
-
-            if (t >= 1f)
+            scratchIds.Clear();
+            foreach (var kvp in activeVoices)
             {
-                from.Stop();
-                crossfading = false;
+                if (!kvp.Value.Paused && !kvp.Value.Source.isPlaying)
+                    scratchIds.Add(kvp.Key);
+            }
+
+            foreach (var id in scratchIds)
+            {
+                var voice = activeVoices[id];
+                ReleaseVoice(id, voice);
+                Stopped?.Invoke(id);
             }
         }
 
-        void TickFadeOut(float deltaTime)
+        bool TryGetVoice(Guid id, string action, out Voice voice)
         {
-            if (!fadingOut || musicA == null || musicB == null)
-                return;
+            if (activeVoices.TryGetValue(id, out voice!))
+                return true;
 
-            var active = musicActiveIsA ? musicA : musicB;
-
-            fadeOutElapsed += deltaTime;
-            var t = fadeOutDuration <= 0f ? 1f : Mathf.Clamp01(fadeOutElapsed / fadeOutDuration);
-            active.volume = Mathf.Lerp(fadeOutStartVolume, 0f, t);
-
-            if (t >= 1f)
-            {
-                active.Stop();
-                fadingOut = false;
-                musicPlaying = false;
-            }
+            GameLogger.LogWarning($"Ignoring {action}; no active instance with id {id}.", LogCategory);
+            return false;
         }
 
-        void PruneFinishedSfxVoices()
+        void ReleaseVoice(Guid id, Voice voice)
         {
-            for (var i = activeSfxVoices.Count - 1; i >= 0; i--)
-            {
-                if (!activeSfxVoices[i].Source.isPlaying)
-                    activeSfxVoices.RemoveAt(i);
-            }
+            activeVoices.Remove(id);
+            inUseSources.Remove(voice.Source);
         }
 
         void ReapplyBusVolumes(AudioBus changedBus)
         {
-            for (var i = 0; i < activeSfxVoices.Count; i++)
+            foreach (var voice in activeVoices.Values)
             {
-                var voice = activeSfxVoices[i];
                 if (changedBus == AudioBus.Master || voice.Bus == changedBus)
-                    voice.Source.volume = voice.BaseVolume * EffectiveVolume(voice.Bus);
-            }
-
-            if (musicPlaying && !crossfading && (changedBus == AudioBus.Master || changedBus == AudioBus.Music) && (musicA != null && musicB != null))
-            {
-                var active = musicActiveIsA ? musicA : musicB;
-                active.volume = musicBaseVolume * EffectiveVolume(AudioBus.Music);
+                    voice.Source.volume = voice.InstanceVolume * EffectiveVolume(voice.Bus);
             }
         }
 
@@ -312,39 +380,16 @@ namespace GameSuite.Audio.Unity
             return volume;
         }
 
-        AudioSource CreateMusicSource(string name)
-        {
-            var go = new GameObject(name);
-            go.transform.SetParent(host!.transform, false);
-            var source = go.AddComponent<AudioSource>();
-            source.playOnAwake = false;
-            return source;
-        }
-
         static AudioClip? PickClip(UnityAudioCue cue)
         {
             var clips = cue.Clips;
             if (clips.Length == 0)
                 return null;
 
-            return clips[Random.Range(0, clips.Length)];
+            return clips[UnityEngine.Random.Range(0, clips.Length)];
         }
 
         /// <summary>Returns a value picked uniformly from <paramref name="range"/> (<c>x</c> to <c>y</c>).</summary>
-        public static float PickInRange(Vector2 range) => Random.Range(range.x, range.y);
-
-        readonly struct SfxVoice
-        {
-            public SfxVoice(AudioSource source, AudioBus bus, float baseVolume)
-            {
-                Source = source;
-                Bus = bus;
-                BaseVolume = baseVolume;
-            }
-
-            public AudioSource Source { get; }
-            public AudioBus Bus { get; }
-            public float BaseVolume { get; }
-        }
+        public static float PickInRange(Vector2 range) => UnityEngine.Random.Range(range.x, range.y);
     }
 }
