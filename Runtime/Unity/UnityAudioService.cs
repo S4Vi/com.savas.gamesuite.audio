@@ -66,7 +66,7 @@ namespace GameSuite.Audio.Unity
         public void Initialize()
         {
             host = new GameObject(HostName);
-            Object.DontDestroyOnLoad(host);
+            UnityEngine.Object.DontDestroyOnLoad(host);
             host.hideFlags = HideFlags.HideAndDontSave;
 
             pool = new AudioSourcePool(host.transform);
@@ -76,7 +76,7 @@ namespace GameSuite.Audio.Unity
         public void Shutdown()
         {
             if (host != null)
-                Object.Destroy(host);
+                UnityEngine.Object.Destroy(host);
 
             host = null;
             pool = null;

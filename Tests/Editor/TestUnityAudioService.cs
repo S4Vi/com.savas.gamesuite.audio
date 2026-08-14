@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 using GameSuite.Audio.Unity;
 
@@ -88,7 +88,7 @@ namespace GameSuite.Audio.Tests
             }
             finally
             {
-                Object.DestroyImmediate(cue);
+                UnityEngine.Object.DestroyImmediate(cue);
             }
         }
 
@@ -132,7 +132,7 @@ namespace GameSuite.Audio.Tests
             }
             finally
             {
-                Object.DestroyImmediate(cue);
+                UnityEngine.Object.DestroyImmediate(cue);
             }
         }
 
