@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-14
+
 ### Fixed
 - `UnityAudioService` and `TestUnityAudioService` failed to compile with CS0104: `Object` was
   ambiguous between `UnityEngine.Object` and `System.Object` in files importing both namespaces.
