@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-16
+
 ### Added
 - `PlayOneShot` and `PlayOneShotAt` take an optional `pitchScale`, multiplied on top of the cue's
   own pitch range — a one-shot can now play at a chosen pitch (ramps, variations) without allocating
