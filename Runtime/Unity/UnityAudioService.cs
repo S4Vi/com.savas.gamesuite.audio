@@ -32,6 +32,7 @@ namespace GameSuite.Audio.Unity
             public AudioCue Cue = null!;
             public float InstanceVolume;
             public bool Paused;
+            public Transform? Follow;
         }
 
         readonly Dictionary<AudioBus, float> busVolume = new Dictionary<AudioBus, float>
@@ -47,9 +48,28 @@ namespace GameSuite.Audio.Unity
         readonly Dictionary<Guid, Voice> activeVoices = new Dictionary<Guid, Voice>();
         readonly HashSet<AudioSource> inUseSources = new HashSet<AudioSource>();
         readonly List<Guid> scratchIds = new List<Guid>();
+        readonly Dictionary<AudioBus, UnityAudioServiceConfig.BusRoute> routes = new Dictionary<AudioBus, UnityAudioServiceConfig.BusRoute>();
+        readonly UnityAudioServiceConfig? config;
 
         GameObject? host;
         AudioSourcePool? pool;
+
+        /// <summary>
+        /// Creates the service with default behavior: C#-multiplied bus volumes and an unconfigured
+        /// voice pool.
+        /// </summary>
+        public UnityAudioService()
+        {
+        }
+
+        /// <summary>
+        /// Creates the service with a configuration asset providing mixer routing and pool sizing.
+        /// </summary>
+        /// <param name="config">The configuration to apply; <c>null</c> behaves like the default constructor.</param>
+        public UnityAudioService(UnityAudioServiceConfig? config)
+        {
+            this.config = config;
+        }
 
         /// <inheritdoc/>
         public int InitializationOrder => -50;
@@ -69,7 +89,35 @@ namespace GameSuite.Audio.Unity
             UnityEngine.Object.DontDestroyOnLoad(host);
             host.hideFlags = HideFlags.HideAndDontSave;
 
-            pool = new AudioSourcePool(host.transform);
+            pool = new AudioSourcePool(host.transform, config?.PrewarmVoices ?? 0, config?.MaxVoices ?? 32);
+
+            BuildRoutes();
+        }
+
+        // Adopts each valid mixer route and syncs the C# bus volume from the mixer's current
+        // parameter value, so GetBusVolume reflects the authored mix rather than pretending 1.
+        void BuildRoutes()
+        {
+            routes.Clear();
+            if (config == null || config.Mixer == null)
+                return;
+
+            foreach (var route in config.BusRoutes)
+            {
+                if (route.Group == null)
+                    continue;
+
+                if (string.IsNullOrEmpty(route.VolumeParameter) || !config.Mixer.GetFloat(route.VolumeParameter, out var decibels))
+                {
+                    GameLogger.LogWarning(
+                        $"Mixer has no exposed parameter '{route.VolumeParameter}' for bus {route.Bus}; " +
+                        "falling back to C#-multiplied volume for that bus.", LogCategory);
+                    continue;
+                }
+
+                routes[route.Bus] = route;
+                busVolume[route.Bus] = DecibelsToLinear(decibels);
+            }
         }
 
         /// <inheritdoc/>
@@ -102,6 +150,52 @@ namespace GameSuite.Audio.Unity
             // Tracked the same as Play(); the pool reclaims it once it stops. Unlike FMOD/Wwise,
             // Unity has no cheaper untracked path worth taking here.
             Play(cue, volumeScale);
+        }
+
+        /// <inheritdoc/>
+        public Guid PlayAt(AudioCue cue, Vector3 position, float volumeScale = 1f)
+        {
+            var id = Play(cue, volumeScale);
+            if (id != Guid.Empty)
+                Spatialize(activeVoices[id], position, follow: null);
+
+            return id;
+        }
+
+        /// <inheritdoc/>
+        public Guid PlayAttached(AudioCue cue, Transform follow, float volumeScale = 1f)
+        {
+            if (follow == null)
+            {
+                GameLogger.LogWarning("Ignoring PlayAttached; follow transform is null.", LogCategory);
+                return Guid.Empty;
+            }
+
+            var id = Play(cue, volumeScale);
+            if (id != Guid.Empty)
+                Spatialize(activeVoices[id], follow.position, follow);
+
+            return id;
+        }
+
+        /// <inheritdoc/>
+        public void PlayOneShotAt(AudioCue cue, Vector3 position, float volumeScale = 1f)
+        {
+            PlayAt(cue, position, volumeScale);
+        }
+
+        void Spatialize(Voice voice, Vector3 position, Transform? follow)
+        {
+            voice.Follow = follow;
+            voice.Source.transform.position = position;
+
+            if (voice.Cue is UnityAudioCue unityCue)
+            {
+                voice.Source.spatialBlend = unityCue.SpatialBlend;
+                voice.Source.minDistance = unityCue.MinDistance;
+                voice.Source.maxDistance = unityCue.MaxDistance;
+                voice.Source.rolloffMode = unityCue.RolloffMode;
+            }
         }
 
         bool TryPrepareVoice(AudioCue cue, float volumeScale, out AudioSource source, out float instanceVolume, out UnityAudioCue? unityCue)
@@ -138,7 +232,18 @@ namespace GameSuite.Audio.Unity
             instanceVolume = PickInRange(candidate.VolumeRange) * volumeScale;
             unityCue = candidate;
 
-            source = pool.Acquire(s => !inUseSources.Contains(s));
+            var acquired = pool.Acquire(s => !inUseSources.Contains(s));
+            if (acquired == null)
+            {
+                GameLogger.LogWarning(
+                    $"Ignoring Play('{candidate.name}'); all {pool.MaxSources} pooled voices are busy.", LogCategory);
+                return false;
+            }
+
+            source = acquired;
+            source.transform.localPosition = Vector3.zero;
+            source.spatialBlend = 0f;
+            source.outputAudioMixerGroup = routes.TryGetValue(candidate.Bus, out var route) ? route.Group : null;
             source.clip = clip;
             source.pitch = PickInRange(candidate.PitchRange);
             source.loop = candidate.Loop;
@@ -310,7 +415,11 @@ namespace GameSuite.Audio.Unity
         public void SetBusVolume(AudioBus bus, float volume01)
         {
             busVolume[bus] = Mathf.Clamp01(volume01);
-            ReapplyBusVolumes(bus);
+
+            if (routes.ContainsKey(bus))
+                ApplyRoutedVolume(bus);
+            else
+                ReapplyBusVolumes(bus);
         }
 
         /// <inheritdoc/>
@@ -320,6 +429,28 @@ namespace GameSuite.Audio.Unity
         public void SetBusMuted(AudioBus bus, bool muted)
         {
             busMuted[bus] = muted;
+
+            if (routes.ContainsKey(bus))
+                ApplyRoutedVolume(bus);
+            else
+                ReapplyBusVolumes(bus);
+        }
+
+        // Writes a routed bus's effective volume (0 while muted) to its exposed mixer parameter. When
+        // the write fails — the parameter was renamed or removed at runtime — the route is dropped and
+        // the bus falls back to the C# path, matching the content-error convention: warn, keep going.
+        void ApplyRoutedVolume(AudioBus bus)
+        {
+            var route = routes[bus];
+            var linear = IsBusMuted(bus) ? 0f : GetBusVolume(bus);
+
+            if (config?.Mixer != null && config.Mixer.SetFloat(route.VolumeParameter, LinearToDecibels(linear)))
+                return;
+
+            GameLogger.LogWarning(
+                $"Failed to write mixer parameter '{route.VolumeParameter}' for bus {bus}; " +
+                "falling back to C#-multiplied volume for that bus.", LogCategory);
+            routes.Remove(bus);
             ReapplyBusVolumes(bus);
         }
 
@@ -329,6 +460,18 @@ namespace GameSuite.Audio.Unity
         /// <inheritdoc/>
         public void Tick(float deltaTime)
         {
+            foreach (var voice in activeVoices.Values)
+            {
+                if (voice.Follow == null)
+                {
+                    // Destroyed transforms compare equal to null; the voice keeps its last position.
+                    voice.Follow = null;
+                    continue;
+                }
+
+                voice.Source.transform.position = voice.Follow.position;
+            }
+
             scratchIds.Clear();
             foreach (var kvp in activeVoices)
             {
@@ -357,6 +500,7 @@ namespace GameSuite.Audio.Unity
         {
             activeVoices.Remove(id);
             inUseSources.Remove(voice.Source);
+            voice.Follow = null;
         }
 
         void ReapplyBusVolumes(AudioBus changedBus)
@@ -368,8 +512,13 @@ namespace GameSuite.Audio.Unity
             }
         }
 
+        // For a mixer-routed bus the mixer owns bus and master attenuation, so only the per-instance
+        // volume reaches AudioSource.volume. The C# path multiplies bus and master as before.
         float EffectiveVolume(AudioBus bus)
         {
+            if (routes.ContainsKey(bus))
+                return 1f;
+
             if (IsBusMuted(bus) || (bus != AudioBus.Master && IsBusMuted(AudioBus.Master)))
                 return 0f;
 
@@ -379,6 +528,22 @@ namespace GameSuite.Audio.Unity
 
             return volume;
         }
+
+        /// <summary>
+        /// Converts a linear volume in <c>[0, 1]</c> to mixer decibels, flooring at −80 dB (silence).
+        /// </summary>
+        /// <param name="linear">The linear volume to convert.</param>
+        /// <returns>The equivalent attenuation in decibels, in <c>[−80, 0]</c> for inputs in <c>[0, 1]</c>.</returns>
+        public static float LinearToDecibels(float linear) =>
+            linear <= 0.0001f ? -80f : Mathf.Max(-80f, 20f * Mathf.Log10(linear));
+
+        /// <summary>
+        /// Converts mixer decibels back to a linear volume, clamped to <c>[0, 1]</c>.
+        /// </summary>
+        /// <param name="decibels">The attenuation in decibels.</param>
+        /// <returns>The equivalent linear volume; −80 dB or below maps to 0.</returns>
+        public static float DecibelsToLinear(float decibels) =>
+            decibels <= -80f ? 0f : Mathf.Clamp01(Mathf.Pow(10f, decibels / 20f));
 
         static AudioClip? PickClip(UnityAudioCue cue)
         {

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 
 using GameSuite.Core;
 
+using UnityEngine;
+
 #nullable enable
 
 namespace GameSuite.Audio.Wwise
@@ -53,6 +55,29 @@ namespace GameSuite.Audio.Wwise
         {
             // TODO: AkSoundEngine.PostEvent(cue.EventName, gameObject) with no callback/tracking.
             throw new System.NotImplementedException("WwiseAudioService.PlayOneShot is not implemented yet.");
+        }
+
+        /// <inheritdoc/>
+        public Guid PlayAt(AudioCue cue, Vector3 position, float volumeScale = 1f)
+        {
+            // TODO: register a temporary game object at position via AkSoundEngine.RegisterGameObj +
+            // AkSoundEngine.SetObjectPosition, post the event on it, unregister when the event ends.
+            throw new System.NotImplementedException("WwiseAudioService.PlayAt is not implemented yet.");
+        }
+
+        /// <inheritdoc/>
+        public Guid PlayAttached(AudioCue cue, Transform follow, float volumeScale = 1f)
+        {
+            // TODO: post the event on follow.gameObject (Wwise tracks registered game objects'
+            // positions itself via AkGameObj).
+            throw new System.NotImplementedException("WwiseAudioService.PlayAttached is not implemented yet.");
+        }
+
+        /// <inheritdoc/>
+        public void PlayOneShotAt(AudioCue cue, Vector3 position, float volumeScale = 1f)
+        {
+            // TODO: same as PlayAt but without tracking the playing ID.
+            throw new System.NotImplementedException("WwiseAudioService.PlayOneShotAt is not implemented yet.");
         }
 
         /// <inheritdoc/>

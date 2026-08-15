@@ -7,6 +7,10 @@ using FMOD.Studio;
 
 using FMODUnity;
 
+// FMOD for Unity 2.03 declares STOP_MODE in both FMOD.Studio and FMODUnity; we always mean the
+// Studio one (EventInstance.stop's parameter type).
+using STOP_MODE = FMOD.Studio.STOP_MODE;
+
 using GameSuite.Core;
 using GameSuite.GameLogging;
 using GameSuite.Threading;
@@ -167,6 +171,49 @@ namespace GameSuite.Audio.FMOD
                 GameLogger.LogError($"Cannot start FMOD one-shot for cue '{cue.name}'. Result: {startResult}", LogCategory);
 
             // release() marks the instance for automatic cleanup once it finishes; it doesn't stop it.
+            instance.release();
+        }
+
+        /// <inheritdoc/>
+        public Guid PlayAt(AudioCue cue, Vector3 position, float volumeScale = 1f)
+        {
+            var id = Play(cue, volumeScale);
+            if (id != Guid.Empty && activeEvents.TryGetValue(id, out var active))
+                active.Instance.set3DAttributes(RuntimeUtils.To3DAttributes(position));
+
+            return id;
+        }
+
+        /// <inheritdoc/>
+        public Guid PlayAttached(AudioCue cue, Transform follow, float volumeScale = 1f)
+        {
+            if (follow == null)
+            {
+                GameLogger.LogWarning("Ignoring PlayAttached; follow transform is null.", LogCategory);
+                return Guid.Empty;
+            }
+
+            var id = Play(cue, volumeScale);
+            if (id != Guid.Empty && activeEvents.TryGetValue(id, out var active))
+                RuntimeManager.AttachInstanceToGameObject(active.Instance, follow);
+
+            return id;
+        }
+
+        /// <inheritdoc/>
+        public void PlayOneShotAt(AudioCue cue, Vector3 position, float volumeScale = 1f)
+        {
+            if (!TryCreateInstance(cue, "PlayOneShotAt", out var instance))
+                return;
+
+            instance.setVolume(Mathf.Max(0f, PickInRange(cue.VolumeRange) * volumeScale));
+            instance.setPitch(Mathf.Max(0.01f, PickInRange(cue.PitchRange)));
+            instance.set3DAttributes(RuntimeUtils.To3DAttributes(position));
+
+            var startResult = instance.start();
+            if (startResult != RESULT.OK)
+                GameLogger.LogError($"Cannot start FMOD one-shot for cue '{cue.name}'. Result: {startResult}", LogCategory);
+
             instance.release();
         }
 

@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- 3D/positional playback on `IAudioService`: `PlayAt(cue, position)`, `PlayAttached(cue, transform)`
+  and `PlayOneShotAt(cue, position)`. Spatialization is authored per backend — `UnityAudioCue` gains
+  spatial blend, min/max distance and rolloff fields applied only by the positional calls (plain
+  `Play` stays 2D); FMOD sets 3D attributes / attaches to the transform; the Wwise stubs gained
+  matching signatures. An instance whose followed transform is destroyed keeps its last position.
+- `UnityAudioServiceConfig`, an optional ScriptableObject passed to `UnityAudioService`'s new
+  constructor: an `AudioMixer` with per-bus group + exposed-volume-parameter routing, and voice-pool
+  sizing (prewarm count, hard cap). Routed buses output through their mixer group and volume/mute
+  writes land on the exposed parameter in dB, so snapshots/ducking/effects work and the mixer
+  hierarchy owns master routing; `GetBusVolume` syncs from the mixer's authored values at boot. A
+  missing or renamed parameter warns and falls back to the C#-multiplied path per bus. Without a
+  config, behavior is unchanged.
+- `GameSuite.Audio.Savegame`, a version-define-gated assembly that activates when
+  `com.savas.gamesuite.savegame` 0.6.0+ is installed: `AudioDeviceSettings` persists per-bus
+  volume/mute through the device-settings pipeline, and `AudioSettingsApplier` applies them at boot
+  and offers write-through setters plus `Save()` for options menus.
+- `AudioSourcePool` is now bounded: constructor takes prewarm and max-source counts, and `Acquire`
+  returns `null` when every source is busy at the cap — `UnityAudioService` then refuses the play
+  with a warning instead of growing without limit.
+- Tests: `AudioSourcePool` sizing/cap behavior, linear↔decibel conversions, positional-playback
+  argument handling, cue spatial defaults, and `AudioDeviceSettings` round-trips (gated with the
+  savegame bridge).
+
+### Fixed
+- The FMOD backend now compiles against FMOD for Unity 2.03.14, verified by temporarily importing
+  the official package: `STOP_MODE` is declared in both `FMOD.Studio` and `FMODUnity` there, so the
+  service now aliases the `FMOD.Studio` one explicitly. This was the only drift from the 2.02-era
+  API the backend was written against.
+
+### Changed
+- **Breaking:** `IAudioService` implementations must add the three positional-playback members.
+- **Breaking:** the FMOD sub-assembly is now gated by the manual `GAMESUITE_AUDIO_FMOD` scripting
+  define instead of a `versionDefines` entry keyed on `com.fmod.unity`. FMOD for Unity ships as a
+  `.unitypackage` importing loose assets into `Assets/Plugins/FMOD` (verified against the official
+  2.03.14 download — it contains no `package.json`), so a package-version gate could never activate
+  and the backend silently never compiled.
+
 ## [0.1.1] - 2026-08-14
 
 ### Fixed

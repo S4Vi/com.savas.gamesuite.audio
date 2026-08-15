@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 
+using UnityEngine;
+
 #nullable enable
 
 namespace GameSuite.Audio
@@ -38,6 +40,36 @@ namespace GameSuite.Audio
         /// <param name="cue">The cue to play. Ignored with a warning if <c>null</c>.</param>
         /// <param name="volumeScale">Extra multiplier applied on top of the cue's own volume range.</param>
         void PlayOneShot(AudioCue cue, float volumeScale = 1f);
+
+        /// <summary>
+        /// Plays <paramref name="cue"/> as a tracked, spatialized instance at a world position.
+        /// Spatialization itself is authored per backend: on the cue for Unity Audio, in the
+        /// event/sound design for FMOD and Wwise.
+        /// </summary>
+        /// <param name="cue">The cue to play. Ignored with a warning if <c>null</c>, returning <see cref="Guid.Empty"/>.</param>
+        /// <param name="position">World position the sound is emitted from.</param>
+        /// <param name="volumeScale">Extra multiplier applied on top of the cue's own volume range.</param>
+        /// <returns>A handle for <see cref="Stop"/>, <see cref="SetVolume"/> etc., or <see cref="Guid.Empty"/> on failure.</returns>
+        Guid PlayAt(AudioCue cue, Vector3 position, float volumeScale = 1f);
+
+        /// <summary>
+        /// Plays <paramref name="cue"/> as a tracked, spatialized instance that follows a transform.
+        /// The instance stops following (and keeps its last position) if the transform is destroyed.
+        /// </summary>
+        /// <param name="cue">The cue to play. Ignored with a warning if <c>null</c>, returning <see cref="Guid.Empty"/>.</param>
+        /// <param name="follow">Transform the sound is attached to. Ignored with a warning if <c>null</c>.</param>
+        /// <param name="volumeScale">Extra multiplier applied on top of the cue's own volume range.</param>
+        /// <returns>A handle for <see cref="Stop"/>, <see cref="SetVolume"/> etc., or <see cref="Guid.Empty"/> on failure.</returns>
+        Guid PlayAttached(AudioCue cue, Transform follow, float volumeScale = 1f);
+
+        /// <summary>
+        /// Plays <paramref name="cue"/> fire-and-forget at a world position. See <see cref="PlayOneShot"/>
+        /// for when to prefer the one-shot path.
+        /// </summary>
+        /// <param name="cue">The cue to play. Ignored with a warning if <c>null</c>.</param>
+        /// <param name="position">World position the sound is emitted from.</param>
+        /// <param name="volumeScale">Extra multiplier applied on top of the cue's own volume range.</param>
+        void PlayOneShotAt(AudioCue cue, Vector3 position, float volumeScale = 1f);
 
         /// <summary>Stops a tracked instance. A no-op (with a warning) if <paramref name="id"/> isn't active.</summary>
         /// <param name="id">The instance to stop.</param>

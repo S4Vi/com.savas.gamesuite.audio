@@ -1,0 +1,28 @@
+{
+    "name": "GameSuite.Audio.Savegame",
+    "rootNamespace": "GameSuite.Audio",
+    "references": [
+        "GameSuite.Audio",
+        "GameSuite.Core",
+        "GameSuite.Logging",
+        "GameSuite.SaveGame",
+        "DeathwingStudios.Json"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "GAMESUITE_AUDIO_SAVEGAME_PRESENT"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.savas.gamesuite.savegame",
+            "expression": "0.6.0",
+            "define": "GAMESUITE_AUDIO_SAVEGAME_PRESENT"
+        }
+    ],
+    "noEngineReferences": false
+}

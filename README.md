@@ -34,7 +34,7 @@ needs to reference) the audio engine it actually uses:
 | Backend | Assembly | Status |
 |---|---|---|
 | Unity Audio | `GameSuite.Audio.Unity` | Fully implemented |
-| FMOD | `GameSuite.Audio.FMOD` | Implemented, untested — see `Runtime/FMOD/README.md` |
+| FMOD | `GameSuite.Audio.FMOD` | Implemented; compiles against FMOD for Unity 2.03.14, runtime untested — see `Runtime/FMOD/README.md` |
 | Wwise | `GameSuite.Audio.Wwise` | Scaffolded — see `Runtime/Wwise/README.md` |
 
 This mirrors how `com.savas.gamesuite.ui` offers `INavigationInput` for both the legacy Input
@@ -110,6 +110,19 @@ ambience.RequestTrack(windLoopCue);   // replaces rainLoopCue immediately, no fa
 ambience.RequestStop();
 ```
 
+### 3D / positional playback
+
+```csharp
+audio.PlayOneShotAt(impactCue, hitPoint);           // fire-and-forget at a world position
+var id = audio.PlayAt(campfireLoopCue, firePos);    // tracked, at a fixed position
+var id2 = audio.PlayAttached(engineLoopCue, carTransform);  // follows the transform
+```
+
+Spatialization is authored per backend: `UnityAudioCue` carries spatial blend, min/max distance and
+rolloff (applied only by the positional calls — plain `Play` stays 2D); FMOD and Wwise author
+attenuation in their own tools. An instance attached to a destroyed transform keeps its last
+position.
+
 ### Buses
 
 ```csharp
@@ -118,15 +131,53 @@ audio.SetBusMuted(AudioBus.Sfx, true);
 ```
 
 Volume changes apply immediately to whatever is already playing on that bus, not just the next thing
-you play. `UnityAudioService` multiplies each bus by `Master`'s volume itself (it has no real submix
-graph); `FMODAudioService` sets an FMOD VCA directly and lets the Studio project's own mixer routing
-handle the hierarchy — see `Runtime/FMOD/README.md`.
+you play. By default `UnityAudioService` multiplies each bus by `Master`'s volume itself (it has no
+real submix graph); `FMODAudioService` sets an FMOD VCA directly and lets the Studio project's own
+mixer routing handle the hierarchy — see `Runtime/FMOD/README.md`.
+
+### AudioMixer routing (Unity Audio backend)
+
+Create a `UnityAudioServiceConfig` asset (**Assets ▸ Create ▸ GameSuite ▸ Audio ▸ Unity Audio
+Service Config**), assign your `AudioMixer`, and map each bus to a mixer group plus an exposed
+volume parameter (in dB). Pass the config to the service:
+
+```csharp
+GameSuiteBootstrap.Register(new UnityAudioService(mixerConfig));
+```
+
+Routed buses output through their mixer group and their volume/mute writes go to the exposed
+parameter, so mixer snapshots, ducking and effects all work; the mixer hierarchy owns the
+master/child relationship. `GetBusVolume` is synced from the mixer's authored values at boot. Buses
+without a group (or with a missing parameter, which warns) stay on the C#-multiplied path — with no
+config at all, behavior is unchanged from 0.1.x. The config also sizes the voice pool (prewarm
+count and a hard cap; when every voice is busy, `Play` is refused with a warning rather than
+stealing one).
+
+### Persisting volume settings
+
+When `com.savas.gamesuite.savegame` (0.6.0+) is installed, the gated `GameSuite.Audio.Savegame`
+assembly activates: `AudioDeviceSettings` stores per-bus volume/mute through the savegame package's
+device-settings pipeline, and `AudioSettingsApplier` applies them to the audio service at boot and
+offers write-through setters for options menus:
+
+```csharp
+GameSuiteBootstrap.Register(new UnityAudioService(mixerConfig));
+GameSuiteBootstrap.Register(new AudioSettingsApplier());   // initializes after the service
+// options menu:
+var applier = ServiceLocator.Get<AudioSettingsApplier>();
+applier.SetBusVolume(AudioBus.Music, slider.value);        // heard immediately, stored in memory
+applier.Save();                                            // persist on confirm/close
+```
+
+Only register the applier once the project has authored the `AudioDeviceSettings` prototype assets
+(`Resources/ScriptableObjects/Runtime/AudioDeviceSettings.asset` and
+`Resources/ScriptableObjects/Default/DEFAULT_AUDIODEVICESETTINGS.asset`).
 
 ### Authoring cues (Unity Audio backend)
 
 Create a `UnityAudioCue` asset (**Assets ▸ Create ▸ GameSuite ▸ Audio ▸ Unity Audio Cue**), assign one
 or more `AudioClip`s (one is picked at random each play), a bus, and optional volume/pitch ranges for
-variation.
+variation. The spatialization block on the cue only applies to `PlayAt`/`PlayAttached`/`PlayOneShotAt`.
 
 ## FMOD / Wwise
 

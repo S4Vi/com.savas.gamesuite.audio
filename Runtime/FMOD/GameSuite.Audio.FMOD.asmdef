@@ -15,14 +15,8 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [
-        "GAMESUITE_AUDIO_FMOD_PRESENT"
+        "GAMESUITE_AUDIO_FMOD"
     ],
-    "versionDefines": [
-        {
-            "name": "com.fmod.unity",
-            "expression": "1.0.0",
-            "define": "GAMESUITE_AUDIO_FMOD_PRESENT"
-        }
-    ],
+    "versionDefines": [],
     "noEngineReferences": false
 }

@@ -2,17 +2,21 @@
 
 A working `IAudioService` backend for FMOD Studio, adapted from a production FMOD wrapper (Guid-
 tracked `EventInstance`s, native `STOPPED`/`TIMELINE_MARKER` callbacks via `GCHandle`-pinned user
-data, VCA-driven bus volume). It has **not been compiled or tested** — neither the FMOD Unity
-Integration nor an FMOD Studio project is available while building this package — so treat it as a
-close port that needs a real FMOD install to verify, not as battle-tested code.
+data, VCA-driven bus volume). It **compiles cleanly against FMOD for Unity 2.03.14** (verified by
+temporarily importing the official package; the only drift from the 2.02-era API it was written
+against was a `STOP_MODE` ambiguity, now aliased). It has not yet been exercised against a live
+FMOD Studio project at runtime, so treat the runtime behavior as a close port pending a first real
+in-game run.
 
 ## What's here
 
 - `GameSuite.Audio.FMOD.asmdef` — references `GameSuite.Audio`, `GameSuite.Threading` and
-  `FMODUnity`, gated by `defineConstraints: ["GAMESUITE_AUDIO_FMOD_PRESENT"]`. That define is set
-  automatically via `versionDefines` once the `com.fmod.unity` UPM package is installed, so this
-  assembly is simply excluded from compilation until then — same mechanism
-  `com.savas.gamesuite.ui`'s `GameSuite.UI.InputSystem` uses for the Input System package.
+  `FMODUnity`, gated by `defineConstraints: ["GAMESUITE_AUDIO_FMOD"]`. Add `GAMESUITE_AUDIO_FMOD`
+  to **Project Settings ▸ Player ▸ Scripting Define Symbols** after importing FMOD for Unity —
+  the same manual-define mechanism the Wwise sub-layer uses. A `versionDefines`-based gate is not
+  possible here: FMOD for Unity ships as a `.unitypackage` that imports loose assets into
+  `Assets/Plugins/FMOD` (verified against the official 2.03.14 download, which contains no
+  `package.json`), and version defines can only key on actual UPM packages.
   `com.savas.gamesuite.threading` isn't listed in this package's `package.json` (same reason
   `com.unity.inputsystem` isn't listed in `com.savas.gamesuite.ui`'s: it's only needed once this
   gated sub-layer actually compiles) — add it yourself alongside FMOD.
@@ -54,10 +58,11 @@ Ported from the reference file's general shape, but trimmed to match `IAudioServ
 
 ## Finishing it
 
-1. Install the FMOD Unity Integration (`com.fmod.unity` via UPM, or FMOD's own package manager),
-   add `com.savas.gamesuite.threading` alongside it, and set up an FMOD Studio project with VCAs
-   named `Master`/`Music`/`Sfx`/`Voice` (or update `VcaPaths`) per the
-   [FMOD Unity docs](https://www.fmod.com/docs/2.02/unity/welcome.html).
+1. Import the FMOD for Unity `.unitypackage` (from fmod.com, requires a free account), add
+   `GAMESUITE_AUDIO_FMOD` to the Scripting Define Symbols, add `com.savas.gamesuite.threading`
+   alongside it, and set up an FMOD Studio project with VCAs named `Master`/`Music`/`Sfx`/`Voice`
+   (or update `VcaPaths`) per the
+   [FMOD Unity docs](https://www.fmod.com/docs/latest/unity/welcome.html).
 2. Open the project and fix whatever the real FMOD API surface disagrees with here — API shape can
    drift slightly between FMOD versions (this was written against the 2.02-era C# API).
 3. A game opts into this backend by constructing `new FMODAudioService()` and registering it with

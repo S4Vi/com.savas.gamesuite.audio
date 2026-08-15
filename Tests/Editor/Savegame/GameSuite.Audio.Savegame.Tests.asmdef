@@ -1,0 +1,35 @@
+{
+    "name": "GameSuite.Audio.Savegame.Tests",
+    "rootNamespace": "GameSuite.Audio.Tests",
+    "references": [
+        "GameSuite.Audio",
+        "GameSuite.Audio.Savegame",
+        "GameSuite.SaveGame",
+        "GameSuite.Core",
+        "DeathwingStudios.Json",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS",
+        "GAMESUITE_AUDIO_SAVEGAME_PRESENT"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.savas.gamesuite.savegame",
+            "expression": "0.6.0",
+            "define": "GAMESUITE_AUDIO_SAVEGAME_PRESENT"
+        }
+    ],
+    "noEngineReferences": false
+}
