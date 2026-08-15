@@ -39,7 +39,11 @@ namespace GameSuite.Audio
         /// </summary>
         /// <param name="cue">The cue to play. Ignored with a warning if <c>null</c>.</param>
         /// <param name="volumeScale">Extra multiplier applied on top of the cue's own volume range.</param>
-        void PlayOneShot(AudioCue cue, float volumeScale = 1f);
+        /// <param name="pitchScale">
+        /// Extra multiplier applied on top of the cue's own pitch range, so pitch ramps and variations
+        /// don't need a tracked instance just to call <see cref="SetPitch"/>.
+        /// </param>
+        void PlayOneShot(AudioCue cue, float volumeScale = 1f, float pitchScale = 1f);
 
         /// <summary>
         /// Plays <paramref name="cue"/> as a tracked, spatialized instance at a world position.
@@ -69,7 +73,8 @@ namespace GameSuite.Audio
         /// <param name="cue">The cue to play. Ignored with a warning if <c>null</c>.</param>
         /// <param name="position">World position the sound is emitted from.</param>
         /// <param name="volumeScale">Extra multiplier applied on top of the cue's own volume range.</param>
-        void PlayOneShotAt(AudioCue cue, Vector3 position, float volumeScale = 1f);
+        /// <param name="pitchScale">Extra multiplier applied on top of the cue's own pitch range.</param>
+        void PlayOneShotAt(AudioCue cue, Vector3 position, float volumeScale = 1f, float pitchScale = 1f);
 
         /// <summary>Stops a tracked instance. A no-op (with a warning) if <paramref name="id"/> isn't active.</summary>
         /// <param name="id">The instance to stop.</param>

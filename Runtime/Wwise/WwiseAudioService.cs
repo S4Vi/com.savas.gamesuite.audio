@@ -51,9 +51,10 @@ namespace GameSuite.Audio.Wwise
         }
 
         /// <inheritdoc/>
-        public void PlayOneShot(AudioCue cue, float volumeScale = 1f)
+        public void PlayOneShot(AudioCue cue, float volumeScale = 1f, float pitchScale = 1f)
         {
-            // TODO: AkSoundEngine.PostEvent(cue.EventName, gameObject) with no callback/tracking.
+            // TODO: AkSoundEngine.PostEvent(cue.EventName, gameObject) with no callback/tracking;
+            // apply pitchScale via the event's pitch RTPC if one is authored.
             throw new System.NotImplementedException("WwiseAudioService.PlayOneShot is not implemented yet.");
         }
 
@@ -74,7 +75,7 @@ namespace GameSuite.Audio.Wwise
         }
 
         /// <inheritdoc/>
-        public void PlayOneShotAt(AudioCue cue, Vector3 position, float volumeScale = 1f)
+        public void PlayOneShotAt(AudioCue cue, Vector3 position, float volumeScale = 1f, float pitchScale = 1f)
         {
             // TODO: same as PlayAt but without tracking the playing ID.
             throw new System.NotImplementedException("WwiseAudioService.PlayOneShotAt is not implemented yet.");

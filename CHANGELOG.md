@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `PlayOneShot` and `PlayOneShotAt` take an optional `pitchScale`, multiplied on top of the cue's
+  own pitch range — a one-shot can now play at a chosen pitch (ramps, variations) without allocating
+  a tracked instance just to call `SetPitch`.
+
+### Changed
+- **Breaking:** custom `IAudioService` implementations must add the `pitchScale` parameter to both
+  one-shot members.
+
+### Fixed
+- `AudioBus.Music`/`AudioBus.Sfx` XML docs referenced `IAudioService.PlayMusic`/`PlaySfx`, which
+  never shipped — leftovers from an earlier design iteration.
+
 ## [0.2.0] - 2026-08-15
 
 ### Added

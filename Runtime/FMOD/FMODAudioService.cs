@@ -158,13 +158,13 @@ namespace GameSuite.Audio.FMOD
         }
 
         /// <inheritdoc/>
-        public void PlayOneShot(AudioCue cue, float volumeScale = 1f)
+        public void PlayOneShot(AudioCue cue, float volumeScale = 1f, float pitchScale = 1f)
         {
             if (!TryCreateInstance(cue, "PlayOneShot", out var instance))
                 return;
 
             instance.setVolume(Mathf.Max(0f, PickInRange(cue.VolumeRange) * volumeScale));
-            instance.setPitch(Mathf.Max(0.01f, PickInRange(cue.PitchRange)));
+            instance.setPitch(Mathf.Max(0.01f, PickInRange(cue.PitchRange) * pitchScale));
 
             var startResult = instance.start();
             if (startResult != RESULT.OK)
@@ -201,13 +201,13 @@ namespace GameSuite.Audio.FMOD
         }
 
         /// <inheritdoc/>
-        public void PlayOneShotAt(AudioCue cue, Vector3 position, float volumeScale = 1f)
+        public void PlayOneShotAt(AudioCue cue, Vector3 position, float volumeScale = 1f, float pitchScale = 1f)
         {
             if (!TryCreateInstance(cue, "PlayOneShotAt", out var instance))
                 return;
 
             instance.setVolume(Mathf.Max(0f, PickInRange(cue.VolumeRange) * volumeScale));
-            instance.setPitch(Mathf.Max(0.01f, PickInRange(cue.PitchRange)));
+            instance.setPitch(Mathf.Max(0.01f, PickInRange(cue.PitchRange) * pitchScale));
             instance.set3DAttributes(RuntimeUtils.To3DAttributes(position));
 
             var startResult = instance.start();

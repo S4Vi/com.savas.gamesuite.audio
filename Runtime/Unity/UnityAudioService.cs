@@ -145,11 +145,12 @@ namespace GameSuite.Audio.Unity
         }
 
         /// <inheritdoc/>
-        public void PlayOneShot(AudioCue cue, float volumeScale = 1f)
+        public void PlayOneShot(AudioCue cue, float volumeScale = 1f, float pitchScale = 1f)
         {
             // Tracked the same as Play(); the pool reclaims it once it stops. Unlike FMOD/Wwise,
             // Unity has no cheaper untracked path worth taking here.
-            Play(cue, volumeScale);
+            var id = Play(cue, volumeScale);
+            ApplyPitchScale(id, pitchScale);
         }
 
         /// <inheritdoc/>
@@ -179,9 +180,19 @@ namespace GameSuite.Audio.Unity
         }
 
         /// <inheritdoc/>
-        public void PlayOneShotAt(AudioCue cue, Vector3 position, float volumeScale = 1f)
+        public void PlayOneShotAt(AudioCue cue, Vector3 position, float volumeScale = 1f, float pitchScale = 1f)
         {
-            PlayAt(cue, position, volumeScale);
+            var id = PlayAt(cue, position, volumeScale);
+            ApplyPitchScale(id, pitchScale);
+        }
+
+        void ApplyPitchScale(Guid id, float pitchScale)
+        {
+            if (id == Guid.Empty || Mathf.Approximately(pitchScale, 1f))
+                return;
+
+            // Scales on top of the pitch already picked from the cue's range, matching volumeScale.
+            activeVoices[id].Source.pitch *= pitchScale;
         }
 
         void Spatialize(Voice voice, Vector3 position, Transform? follow)

@@ -9,10 +9,10 @@ namespace GameSuite.Audio
         /// <summary>Scales every other bus in addition to its own volume.</summary>
         Master,
 
-        /// <summary>Background music played through <see cref="IAudioService.PlayMusic"/>.</summary>
+        /// <summary>Background music, typically driven through <see cref="MusicController"/>.</summary>
         Music,
 
-        /// <summary>One-shot sound effects played through <see cref="IAudioService.PlaySfx"/>.</summary>
+        /// <summary>Sound effects — one-shots and tracked gameplay loops.</summary>
         Sfx,
 
         /// <summary>Dialogue and other voice playback.</summary>

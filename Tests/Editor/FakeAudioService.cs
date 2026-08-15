@@ -30,7 +30,7 @@ namespace GameSuite.Audio.Tests
             return id;
         }
 
-        public void PlayOneShot(AudioCue cue, float volumeScale = 1f)
+        public void PlayOneShot(AudioCue cue, float volumeScale = 1f, float pitchScale = 1f)
         {
         }
 
@@ -39,7 +39,7 @@ namespace GameSuite.Audio.Tests
         public Guid PlayAttached(AudioCue cue, Transform follow, float volumeScale = 1f) =>
             follow == null ? Guid.Empty : Play(cue, volumeScale);
 
-        public void PlayOneShotAt(AudioCue cue, Vector3 position, float volumeScale = 1f)
+        public void PlayOneShotAt(AudioCue cue, Vector3 position, float volumeScale = 1f, float pitchScale = 1f)
         {
         }
 
