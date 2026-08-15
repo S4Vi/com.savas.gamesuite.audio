@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-15
+
 ### Added
 - 3D/positional playback on `IAudioService`: `PlayAt(cue, position)`, `PlayAttached(cue, transform)`
   and `PlayOneShotAt(cue, position)`. Spatialization is authored per backend — `UnityAudioCue` gains
