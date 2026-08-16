@@ -139,6 +139,14 @@ namespace GameSuite.Audio.Wwise
         }
 
         /// <inheritdoc/>
+        public void SetPitchScale(Guid id, float pitchScale)
+        {
+            // TODO: same RTPC approach as SetPitch; Wwise pitch RTPCs are typically authored as
+            // relative cents, which maps naturally to a scale.
+            throw new System.NotImplementedException("WwiseAudioService.SetPitchScale is not implemented yet.");
+        }
+
+        /// <inheritdoc/>
         public bool GetPitch(Guid id, out float pitch)
         {
             throw new System.NotImplementedException("WwiseAudioService.GetPitch is not implemented yet.");

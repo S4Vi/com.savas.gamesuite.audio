@@ -91,6 +91,10 @@ namespace GameSuite.Audio.Tests
         {
         }
 
+        public void SetPitchScale(Guid id, float pitchScale)
+        {
+        }
+
         public bool GetPitch(Guid id, out float pitch)
         {
             pitch = 1f;

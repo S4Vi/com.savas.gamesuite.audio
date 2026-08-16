@@ -314,6 +314,21 @@ namespace GameSuite.Audio.FMOD
         }
 
         /// <inheritdoc/>
+        /// <remarks>
+        /// FMOD's per-instance pitch is already a multiplier on top of the event's authored pitch,
+        /// so scale and absolute pitch coincide on this backend.
+        /// </remarks>
+        public void SetPitchScale(Guid id, float pitchScale)
+        {
+            if (!TryGetActive(id, "SetPitchScale", out var active))
+                return;
+
+            var result = active.Instance.setPitch(pitchScale);
+            if (result != RESULT.OK)
+                GameLogger.LogError($"Cannot set pitch scale on FMOD event {id}. Result: {result}", LogCategory);
+        }
+
+        /// <inheritdoc/>
         public bool GetPitch(Guid id, out float pitch)
         {
             pitch = 0f;

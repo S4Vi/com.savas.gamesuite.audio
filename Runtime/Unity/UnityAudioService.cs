@@ -31,6 +31,7 @@ namespace GameSuite.Audio.Unity
             public AudioBus Bus;
             public AudioCue Cue = null!;
             public float InstanceVolume;
+            public float RolledPitch;
             public bool Paused;
             public Transform? Follow;
         }
@@ -139,7 +140,11 @@ namespace GameSuite.Audio.Unity
                 return Guid.Empty;
 
             var id = Guid.NewGuid();
-            activeVoices[id] = new Voice { Source = source, Bus = unityCue!.Bus, Cue = unityCue, InstanceVolume = instanceVolume };
+            activeVoices[id] = new Voice
+            {
+                Source = source, Bus = unityCue!.Bus, Cue = unityCue,
+                InstanceVolume = instanceVolume, RolledPitch = source.pitch
+            };
             inUseSources.Add(source);
             return id;
         }
@@ -192,7 +197,8 @@ namespace GameSuite.Audio.Unity
                 return;
 
             // Scales on top of the pitch already picked from the cue's range, matching volumeScale.
-            activeVoices[id].Source.pitch *= pitchScale;
+            var voice = activeVoices[id];
+            voice.Source.pitch = voice.RolledPitch * pitchScale;
         }
 
         void Spatialize(Voice voice, Vector3 position, Transform? follow)
@@ -349,6 +355,15 @@ namespace GameSuite.Audio.Unity
                 return;
 
             voice.Source.pitch = pitch;
+        }
+
+        /// <inheritdoc/>
+        public void SetPitchScale(Guid id, float pitchScale)
+        {
+            if (!TryGetVoice(id, "SetPitchScale", out var voice))
+                return;
+
+            voice.Source.pitch = voice.RolledPitch * pitchScale;
         }
 
         /// <inheritdoc/>

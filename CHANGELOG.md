@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `IAudioService.SetPitchScale(id, pitchScale)` — scales a tracked instance's pitch relative to
+  the value rolled from the cue's authored `pitchRange`, so deliberate pitch ramps (rising combo
+  chimes) preserve the authored humanization. Mirrors the one-shot calls' `pitchScale` parameter.
+  `UnityAudioService` remembers each voice's rolled pitch; on FMOD the native per-instance pitch
+  is already a multiplier, so scale and absolute coincide there.
+
+### Changed
+- **Breaking:** custom `IAudioService` implementations must add `SetPitchScale`.
+- `SetPitch` docs now state explicitly that it is absolute: it replaces the rolled `pitchRange`
+  value outright, which previously made deliberate pitch and authored humanization silently
+  mutually exclusive per voice with nothing in the API saying so.
+
 ## [0.3.0] - 2026-08-16
 
 ### Added

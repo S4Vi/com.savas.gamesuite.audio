@@ -111,6 +111,18 @@ namespace GameSuite.Audio.Tests
         }
 
         [Test]
+        public void SetPitchIgnoresUnknownId()
+        {
+            Assert.DoesNotThrow(() => service.SetPitch(Guid.NewGuid(), 2f));
+        }
+
+        [Test]
+        public void SetPitchScaleIgnoresUnknownId()
+        {
+            Assert.DoesNotThrow(() => service.SetPitchScale(Guid.NewGuid(), 1.5f));
+        }
+
+        [Test]
         public void IsPlayingReturnsFalseForUnknownId()
         {
             Assert.IsFalse(service.IsPlaying(Guid.NewGuid()));

@@ -105,8 +105,23 @@ namespace GameSuite.Audio
         /// <returns><c>true</c> if <paramref name="id"/> is active and <paramref name="volume01"/> was read.</returns>
         bool GetVolume(Guid id, out float volume01);
 
-        /// <summary>Sets the playback pitch (1 = normal). A no-op (with a warning) if inactive.</summary>
+        /// <summary>
+        /// Sets the playback pitch to an <b>absolute</b> value (1 = normal), replacing whatever pitch
+        /// the instance started with — including the value rolled from the cue's authored
+        /// <c>pitchRange</c>. Deliberate pitch and authored humanization are therefore mutually
+        /// exclusive on this path; use <see cref="SetPitchScale"/> to keep the roll. A no-op (with a
+        /// warning) if inactive.
+        /// </summary>
         void SetPitch(Guid id, float pitch);
+
+        /// <summary>
+        /// Scales the playback pitch <b>relative</b> to what the instance started with: the final
+        /// pitch is the cue's rolled <c>pitchRange</c> value times <paramref name="pitchScale"/>, so
+        /// pitch ramps (rising combo chimes, cascade steps) preserve the authored humanization.
+        /// Mirrors the <c>pitchScale</c> parameter of the one-shot playback calls. Successive calls
+        /// replace the scale rather than stacking. A no-op (with a warning) if inactive.
+        /// </summary>
+        void SetPitchScale(Guid id, float pitchScale);
 
         /// <summary>Returns the current playback pitch.</summary>
         /// <returns><c>true</c> if <paramref name="id"/> is active and <paramref name="pitch"/> was read.</returns>
