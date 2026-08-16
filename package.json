@@ -1,7 +1,7 @@
 {
     "name": "com.savas.gamesuite.audio",
     "displayName": "GameSuite Audio",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "unity": "6000.0",
     "description": "Technology-agnostic audio for the GameSuite: one IAudioService with buses, cues and music crossfade, backed by a Unity Audio implementation today and gated FMOD/Wwise sub-layers for later.",
     "author": {

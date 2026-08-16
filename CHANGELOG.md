@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-16
+
 ### Added
 - `IAudioService.SetPitchScale(id, pitchScale)` — scales a tracked instance's pitch relative to
   the value rolled from the cue's authored `pitchRange`, so deliberate pitch ramps (rising combo

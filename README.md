@@ -61,7 +61,7 @@ of your game keep talking to `IAudioService` and never notice.
 ## Installation
 
 ```json
-"com.savas.gamesuite.audio": "https://github.com/S4Vi/com.savas.gamesuite.audio.git#v0.3.0"
+"com.savas.gamesuite.audio": "https://github.com/S4Vi/com.savas.gamesuite.audio.git#v0.4.0"
 ```
 
 Requires Unity 6000.0 or newer. Depends on `com.savas.gamesuite.core` (`0.4.0`) and
